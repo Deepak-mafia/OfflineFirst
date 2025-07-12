@@ -11,13 +11,9 @@ import {
   ScrollView,
   Modal,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
-import {
-  initDB,
-  addBusiness,
-  getBusinesses,
-  deleteBusiness,
-} from '../database/sqlite';
+import { getDB } from '../database/rxdb';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -25,31 +21,76 @@ export default function BusinessScreen({ navigation }) {
   const [businesses, setBusinesses] = useState([]);
   const [name, setName] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
+  const [db, setDb] = useState(null);
+  const [subscription, setSubscription] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
-      await initDB();
-      loadBusinesses();
+      try {
+        const dbInstance = await getDB();
+        console.log('DB instance:', dbInstance);
+        console.log('Collections:', Object.keys(dbInstance.collections));
+      } catch (err) {
+        console.log('RxDB error:', err);
+      }
     })();
   }, []);
 
-  const loadBusinesses = async () => {
-    const data = await getBusinesses();
-    setBusinesses(data);
-  };
+  useEffect(() => {
+    let sub;
+    let isMounted = true;
+    (async () => {
+      try {
+        const dbInstance = await getDB();
+        if (!isMounted) return;
+        setDb(dbInstance);
+        sub = dbInstance.businesses
+          .find()
+          .sort({ name: 'asc' })
+          .$.subscribe(businessDocs => {
+            setBusinesses(
+              (businessDocs || [])
+                .filter(doc => !!doc)
+                .map(doc => doc.toJSON()),
+            );
+            setLoading(false);
+          });
+        setSubscription(sub);
+      } catch (err) {
+        console.log('RxDB error:', err);
+        setLoading(false);
+      }
+    })();
+    return () => {
+      isMounted = false;
+      if (sub) sub.unsubscribe();
+    };
+  }, []);
 
   const handleAdd = async () => {
-    if (!name.trim()) return;
-    await addBusiness(uuidv4(), name.trim());
+    if (!name.trim() || !db) {
+      return;
+    }
+    await db.businesses.insert({ id: uuidv4(), name: name.trim() });
     setName('');
     setModalVisible(false);
-    loadBusinesses();
   };
 
   const handleDelete = async id => {
-    await deleteBusiness(id);
-    loadBusinesses();
+    if (!db) return;
+    const doc = await db.businesses.findOne({ selector: { id } }).exec();
+    if (doc) await doc.remove();
   };
+
+  if (loading) {
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#333399" />
+        <Text style={{ marginTop: 12, color: '#333399' }}>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -64,22 +105,24 @@ export default function BusinessScreen({ navigation }) {
         <Text style={styles.title}>Businesses</Text>
         <FlatList
           data={businesses}
-          keyExtractor={item => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.itemRow}>
-              <Text>{item.name}</Text>
-              <Button title="Delete" onPress={() => handleDelete(item.id)} />
-              <Button
-                title="Articles"
-                onPress={() =>
-                  navigation.navigate('Articles', {
-                    businessId: item.id,
-                    businessName: item.name,
-                  })
-                }
-              />
-            </View>
-          )}
+          keyExtractor={item => item?.id || Math.random().toString()}
+          renderItem={({ item }) =>
+            item ? (
+              <View style={styles.itemRow}>
+                <Text>{item.name}</Text>
+                <Button title="Delete" onPress={() => handleDelete(item.id)} />
+                <Button
+                  title="Articles"
+                  onPress={() =>
+                    navigation.navigate('Articles', {
+                      businessId: item.id,
+                      businessName: item.name,
+                    })
+                  }
+                />
+              </View>
+            ) : null
+          }
         />
       </ScrollView>
       {/* Floating Action Button */}
@@ -116,7 +159,7 @@ export default function BusinessScreen({ navigation }) {
                   setName('');
                 }}
               />
-              <Button title="Add Business" onPress={handleAdd} />
+              <Button title="Add Business" onPress={handleAdd} disabled={!db} />
             </View>
           </View>
         </View>
@@ -126,6 +169,12 @@ export default function BusinessScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
   scrollContainer: { flexGrow: 1, padding: 16 },
   title: { fontSize: 24, fontWeight: 'bold', marginBottom: 16 },
   input: {

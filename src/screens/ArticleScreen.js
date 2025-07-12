@@ -12,13 +12,10 @@ import {
   Modal,
   TouchableOpacity,
 } from 'react-native';
-import {
-  addArticle,
-  getArticlesByBusiness,
-  deleteArticle,
-} from '../database/sqlite';
+import { getDB } from '../database/rxdb';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
+// import { AntDesign } from '@expo/vector-icons';
 
 export default function ArticleScreen({ route }) {
   const { businessId, businessName } = route.params;
@@ -27,35 +24,48 @@ export default function ArticleScreen({ route }) {
   const [qty, setQty] = useState('');
   const [sellingPrice, setSellingPrice] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
+  const [db, setDb] = useState(null);
+  const [subscription, setSubscription] = useState(null);
 
   useEffect(() => {
-    loadArticles();
+    let sub;
+    (async () => {
+      const dbInstance = await getDB();
+      setDb(dbInstance);
+      // Subscribe to live changes for articles of this business
+      sub = dbInstance.articles
+        .find({ selector: { business_id: businessId } })
+        .sort({ name: 'asc' })
+        .$.subscribe(articleDocs => {
+          setArticles(articleDocs.map(doc => doc.toJSON()));
+        });
+      setSubscription(sub);
+    })();
+    return () => {
+      if (subscription) subscription.unsubscribe();
+    };
+    // eslint-disable-next-line
   }, []);
 
-  const loadArticles = async () => {
-    const data = await getArticlesByBusiness(businessId);
-    setArticles(data);
-  };
-
   const handleAdd = async () => {
-    if (!name.trim() || !qty || !sellingPrice) return;
-    await addArticle(
-      uuidv4(),
-      name.trim(),
-      parseInt(qty, 10),
-      parseFloat(sellingPrice),
-      businessId,
-    );
+    if (!name.trim() || !qty || !sellingPrice || !db) return;
+    await db.articles.insert({
+      id: uuidv4(),
+      name: name.trim(),
+      qty: parseInt(qty, 10),
+      selling_price: parseFloat(sellingPrice),
+      business_id: businessId,
+    });
     setName('');
     setQty('');
     setSellingPrice('');
     setModalVisible(false);
-    loadArticles();
   };
 
   const handleDelete = async id => {
-    await deleteArticle(id);
-    loadArticles();
+    if (!db) return;
+    const doc = await db.articles.findOne({ selector: { id } }).exec();
+    if (doc) await doc.remove();
   };
 
   return (
