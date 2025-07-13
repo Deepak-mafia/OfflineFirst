@@ -10,10 +10,12 @@
     "test": "jest"
   },
   "dependencies": {
+    "@react-native-community/netinfo": "^11.4.1",
     "@react-native/new-app-screen": "0.80.1",
     "@react-navigation/native": "^7.1.14",
     "@react-navigation/stack": "^7.4.2",
     "js-sha256": "^0.11.1",
+    "lucide-react-native": "^0.525.0",
     "react": "19.1.0",
     "react-native": "0.80.1",
     "react-native-gesture-handler": "^2.27.1",
@@ -21,6 +23,9 @@
     "react-native-quick-sqlite": "^8.2.7",
     "react-native-safe-area-context": "^5.5.2",
     "react-native-screens": "^4.11.1",
+    "react-native-svg": "^15.12.0",
+    "react-native-toast-message": "^2.3.3",
+    "react-native-vector-icons": "^10.2.0",
     "rxdb": "^16.15.0",
     "rxjs": "^7.8.2",
     "uuid": "^11.1.0"

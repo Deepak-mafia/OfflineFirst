@@ -12,9 +12,15 @@ import {
   Modal,
   TouchableOpacity,
 } from 'react-native';
-import { getDB } from '../database/rxdb';
+import {
+  getDB,
+  deleteDocumentFromCouchDB,
+  syncToCouchDB,
+} from '../database/rxdb';
+import Toast from 'react-native-toast-message';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
+import { Trash2 } from 'lucide-react-native';
 // import { AntDesign } from '@expo/vector-icons';
 
 export default function ArticleScreen({ route }) {
@@ -48,7 +54,10 @@ export default function ArticleScreen({ route }) {
   }, []);
 
   const handleAdd = async () => {
-    if (!name.trim() || !qty || !sellingPrice || !db) return;
+    if (!name.trim() || !qty || !sellingPrice || !db) {
+      Toast.show({ type: 'error', text1: 'All fields are required!' });
+      return;
+    }
     await db.articles.insert({
       id: uuidv4(),
       name: name.trim(),
@@ -60,12 +69,19 @@ export default function ArticleScreen({ route }) {
     setQty('');
     setSellingPrice('');
     setModalVisible(false);
+    await syncToCouchDB(db.articles, 'articles');
+    Toast.show({ type: 'success', text1: 'Article added!' });
   };
 
   const handleDelete = async id => {
     if (!db) return;
     const doc = await db.articles.findOne({ selector: { id } }).exec();
-    if (doc) await doc.remove();
+    if (doc) {
+      await doc.remove();
+      await deleteDocumentFromCouchDB('articles', id);
+      await syncToCouchDB(db.articles, 'articles');
+      Toast.show({ type: 'success', text1: 'Article deleted!' });
+    }
   };
 
   return (
@@ -87,7 +103,12 @@ export default function ArticleScreen({ route }) {
               <Text>
                 {item.name} | Qty: {item.qty} | Price: {item.selling_price}
               </Text>
-              <Button title="Delete" onPress={() => handleDelete(item.id)} />
+              <Trash2
+                size={24}
+                color="#F44336"
+                onPress={() => handleDelete(item.id)}
+                accessibilityLabel="Delete"
+              />
             </View>
           )}
         />
@@ -151,6 +172,8 @@ export default function ArticleScreen({ route }) {
           </View>
         </View>
       </Modal>
+      {/* Toast Message */}
+      <Toast />
     </KeyboardAvoidingView>
   );
 }
