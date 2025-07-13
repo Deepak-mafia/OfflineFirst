@@ -95,3 +95,126 @@ To learn more about React Native, take a look at the following resources:
 - [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
 - [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
 - [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+
+# CouchDB Local Setup & React Native App Configuration
+
+## 1. Install CouchDB Locally
+
+- Download and install CouchDB from: [https://couchdb.apache.org/#download](https://couchdb.apache.org/#download)
+- Start CouchDB. By default, it runs at:
+  - `http://127.0.0.1:5984/`
+  - The admin dashboard is at: `http://127.0.0.1:5984/_utils`
+
+## 2. Set Up CouchDB Admin User
+
+- On first launch, set up an admin username and password in the Fauxton dashboard.
+- Remember these credentials; you’ll need them in your app config.
+
+## 3. Configure Your React Native App
+
+### A. For Android Emulator
+
+- The Android emulator cannot access `localhost` directly.
+- Use the special IP `10.0.2.2` to access your computer’s localhost.
+
+**Example config (`src/utils/couchdbConfig.js`):**
+
+```js
+export const getCouchDBUrl = () => {
+  return 'http://10.0.2.2:5984';
+};
+
+export const COUCHDB_CONFIG = {
+  url: getCouchDBUrl(),
+  database: 'offlinefirstdb', // or your chosen DB name
+  username: 'YOUR_ADMIN_USERNAME',
+  password: 'YOUR_ADMIN_PASSWORD',
+};
+```
+
+### B. For Physical Device (Same Wi-Fi Network as Computer)
+
+1. **Find your computer’s local IP address:**
+   - On Windows: Open Command Prompt and run `ipconfig`. Look for `IPv4 Address` (e.g., `192.168.1.100`).
+   - On Mac/Linux: Run `ifconfig` or check your network settings.
+2. **Update your app config:**
+
+```js
+export const getCouchDBUrl = () => {
+  return 'http://192.168.1.100:5984'; // Replace with your actual IP
+};
+
+export const COUCHDB_CONFIG = {
+  url: getCouchDBUrl(),
+  database: 'offlinefirstdb',
+  username: 'YOUR_ADMIN_USERNAME',
+  password: 'YOUR_ADMIN_PASSWORD',
+};
+```
+
+3. **Make sure your firewall allows incoming connections on port 5984.**
+
+### C. For iOS Simulator
+
+- The iOS simulator can use `localhost` directly:
+
+```js
+export const getCouchDBUrl = () => {
+  return 'http://localhost:5984';
+};
+```
+
+## 4. Run the App
+
+- Start CouchDB on your computer.
+- Run your React Native app on the emulator or physical device.
+- The app will connect to CouchDB using the config above.
+
+## 5. Troubleshooting
+
+- **If the app cannot connect:**
+  - Double-check the IP address and port.
+  - Ensure both devices are on the same Wi-Fi network.
+  - Temporarily disable your firewall to test (re-enable after).
+  - Try accessing `http://<your-ip>:5984/_utils` from your phone’s browser.
+
+## 6. Switching Between Emulator and Device
+
+- Change the `getCouchDBUrl` function as needed for your test environment.
+
+## 7. Example: Full Config File
+
+```js
+// src/utils/couchdbConfig.js
+import { Platform } from 'react-native';
+
+export const getCouchDBUrl = () => {
+  if (Platform.OS === 'android') {
+    // Android emulator
+    return 'http://10.0.2.2:5984';
+  } else if (Platform.OS === 'ios') {
+    // iOS simulator
+    return 'http://localhost:5984';
+  } else {
+    // For physical device, set your computer's IP
+    return 'http://192.168.1.100:5984'; // Replace with your IP
+  }
+};
+
+export const COUCHDB_CONFIG = {
+  url: getCouchDBUrl(),
+  database: 'offlinefirstdb',
+  username: 'YOUR_ADMIN_USERNAME',
+  password: 'YOUR_ADMIN_PASSWORD',
+};
+```
+
+## 8. Summary Table
+
+| Environment      | CouchDB URL Example   |
+| ---------------- | --------------------- |
+| Android Emulator | http://10.0.2.2:5984  |
+| iOS Simulator    | http://localhost:5984 |
+| Physical Device  | http://<your-ip>:5984 |
+
+**Replace `YOUR_ADMIN_USERNAME` and `YOUR_ADMIN_PASSWORD` with your actual CouchDB credentials.**
